@@ -41,25 +41,33 @@ jobs:
           echo "Selected device: $NAME ($UDID)"
 
       - name: Boot simulator
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           UDID="${{ steps.sim.outputs.udid }}"
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b &
-          BOOT_PID=$!
-          for i in $(seq 1 120); do
-            if ! kill -0 $BOOT_PID 2>/dev/null; then break; fi
-            sleep 1
-          done
-          if kill -0 $BOOT_PID 2>/dev/null; then
-            echo "Boot status timed out, killing and retrying with erase..."
+
+          boot_with_timeout() {
+            xcrun simctl bootstatus "$UDID" -b &
+            local BOOT_PID=$!
+            for i in $(seq 1 120); do
+              if ! kill -0 $BOOT_PID 2>/dev/null; then wait $BOOT_PID; return $?; fi
+              sleep 1
+            done
             kill -9 $BOOT_PID 2>/dev/null || true
+            return 1
+          }
+
+          xcrun simctl boot "$UDID" || true
+          if boot_with_timeout; then
+            echo "Simulator booted successfully."
+          else
+            echo "Boot status timed out, killing and retrying with erase..."
             xcrun simctl shutdown "$UDID" || true
             xcrun simctl erase "$UDID" || true
             xcrun simctl boot "$UDID"
-            xcrun simctl bootstatus "$UDID" -b
-          else
-            wait $BOOT_PID
+            if ! boot_with_timeout; then
+              echo "Boot still timed out after erase+retry — aborting."
+              exit 1
+            fi
           fi
 
       - name: Run unit + UI tests (must fail job on failure)
