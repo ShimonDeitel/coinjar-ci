@@ -57,8 +57,15 @@ def main():
     # Check for an existing (possibly incomplete) screenshot resource first — a prior
     # run may have reserved one and never finished the PUT+PATCH, and Apple 409s on a
     # second POST ("Screenshot already exists") regardless of the IAP's own state.
-    status, existing_ss = req("GET", f"/inAppPurchases/{IAP_ID}/appStoreReviewScreenshot", token)
-    existing_data = existing_ss.get("data")
+    try:
+        status, existing_ss = req("GET", f"/inAppPurchases/{IAP_ID}/appStoreReviewScreenshot", token)
+        existing_data = existing_ss.get("data")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print("No existing review screenshot relationship (404) — proceeding with fresh upload.")
+            existing_data = None
+        else:
+            raise
     if existing_data:
         ss_id = existing_data["id"]
         delivery_state = existing_data.get("attributes", {}).get("assetDeliveryState", {}).get("state")
