@@ -58,7 +58,7 @@ def main():
     # run may have reserved one and never finished the PUT+PATCH, and Apple 409s on a
     # second POST ("Screenshot already exists") regardless of the IAP's own state.
     try:
-        status, existing_ss = req("GET", f"/inAppPurchases/{IAP_ID}/appStoreReviewScreenshot", token)
+        status, existing_ss = req("GET", f"https://api.appstoreconnect.apple.com/v2/inAppPurchases/{IAP_ID}/appStoreReviewScreenshot", token)
         existing_data = existing_ss.get("data")
     except urllib.error.HTTPError as e:
         if e.code == 404:
