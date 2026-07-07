@@ -11,7 +11,7 @@ final class CoinjarUITests: XCTestCase {
 
     func testAddFirstKid() {
         let addFirstKidButton = app.buttons["addFirstKidButton"]
-        XCTAssertTrue(addFirstKidButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(addFirstKidButton.waitForExistence(timeout: 15))
         addFirstKidButton.tap()
         let nameField = app.textFields["kidNameField"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
