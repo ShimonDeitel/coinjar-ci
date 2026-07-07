@@ -49,16 +49,27 @@ def req(method, path, token, body=None):
 def main():
     token = make_jwt()
 
-    status, existing = req("GET", f"https://api.appstoreconnect.apple.com/v2/inAppPurchases/{IAP_ID}", token)
-    iap_state = existing.get("data", {}).get("attributes", {}).get("state")
-    if iap_state and iap_state != "MISSING_METADATA":
-        print(f"IAP state is already '{iap_state}' (not MISSING_METADATA) — review screenshot already set, skipping.")
-        return
-
     with open(SCREENSHOT_PATH, "rb") as f:
         content = f.read()
     file_size = len(content)
     file_name = os.path.basename(SCREENSHOT_PATH)
+
+    # Check for an existing (possibly incomplete) screenshot resource first — a prior
+    # run may have reserved one and never finished the PUT+PATCH, and Apple 409s on a
+    # second POST ("Screenshot already exists") regardless of the IAP's own state.
+    status, existing_ss = req("GET", f"/inAppPurchases/{IAP_ID}/appStoreReviewScreenshot", token)
+    existing_data = existing_ss.get("data")
+    if existing_data:
+        ss_id = existing_data["id"]
+        delivery_state = existing_data.get("attributes", {}).get("assetDeliveryState", {}).get("state")
+        print(f"Existing review screenshot {ss_id} found, assetDeliveryState={delivery_state}")
+        if delivery_state == "COMPLETE":
+            print("IAP_SCREENSHOT_UPLOAD_COMPLETE")
+            print(f"IAP_SCREENSHOT_ID={ss_id}")
+            return
+        # Incomplete/failed — delete it so we can reserve a fresh one cleanly.
+        print("Existing screenshot is incomplete — deleting so we can re-upload cleanly.")
+        req("DELETE", f"/inAppPurchaseAppStoreReviewScreenshots/{ss_id}", token)
 
     body = {
         "data": {
